@@ -25,10 +25,6 @@ abstract contract DelegateStaking {
         uint256 _tokenId,
         uint256 _expiry
     ) private returns (uint256 delegateId) {
-        // Ensure asset is already held by contract
-        if (IERC721(_erc721).ownerOf(_tokenId) != address(this)) {
-            revert NotStaked();
-        }
         // Set approval for DelegateToken contract to use ERC721 asset if necessary
         if (!IERC721(_erc721).isApprovedForAll(address(this), _dt)) {
             IERC721(_erc721).setApprovalForAll(_dt, true);
@@ -46,14 +42,44 @@ abstract contract DelegateStaking {
         dInfo.expiry = _expiry;
 
         // Stake ERC721 asset in DelegateToken.sol for delegate token in return
-        delegateId = IDelegateToken(_dt).create(dInfo, ++_salt);
+        //delegateId = IDelegateToken(_dt).create(dInfo, ++_salt);
+        delegateId = IDelegateToken(_dt).create(
+            Structs.DelegateInfo(
+                address(this),
+                IDelegateRegistry.DelegationType.ERC721,
+                msg.sender,
+                0,
+                _erc721,
+                _tokenId,
+                "",
+                _expiry
+            ),
+            ++_salt
+        );
 
-        // Confirm delegation was successful
+        // Confirm delegate token was distributed to sender
         if (IERC721(_dt).ownerOf(delegateId) != msg.sender) {
             revert DelegationFailure();
         }
+        // Confirm staked ERC721 token is held by DelegateToken contract
         if (IERC721(_erc721).ownerOf(_tokenId) != _dt) {
             revert DelegationFailure();
         }
+    }
+
+    // Stake ERC721 asset and retrieve delegate tokens
+    function _stake721(
+        address _erc721,
+        uint256 _tokenId,
+        uint256 _expiry
+    ) internal {
+        // Transfer ERC721 token to this contract
+        IERC721(_erc721).transferFrom(IERC721(_erc721).ownerOf(_tokenId), address(this), _tokenId);
+        // Ensure asset is now held by the contract
+        if (IERC721(_erc721).ownerOf(_tokenId) != address(this)) {
+            revert NotStaked();
+        }
+        // Process DelegateToken integration handling
+        _delegate721(_erc721, _tokenId, _expiry);
     }
 }
