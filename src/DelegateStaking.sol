@@ -85,12 +85,14 @@ abstract contract DelegateStaking {
         _delegateIds[_erc721][_tokenId] = _delegate721(_erc721, _tokenId, _expiry);
     }
 
-    // Rescind delegate token and withdraw from DelegateToken
-    function _remove721(uint256 _delegateId) private {
+    // Rescind delegate token, withdraw from DelegateToken, purge storage
+    function _remove721(address _erc721, uint256 _tokenId) private {
         // Rescind delegate token
         IDelegateToken(_dt).rescind(_delegateId);
         // Withdraw ERC721 token from DelegateToken
         IDelegateToken(_dt).withdraw(_delegateId);
+        // Purge storage
+        delete delegateIds[_erc721][_tokenIds];
     }
 
     // Revoke/Liquidate ownership of asset and withdraw to address(this) or recipient if set
