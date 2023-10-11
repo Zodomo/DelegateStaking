@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: CC0-1.0
+pragma solidity ^0.8.21;
 
 import {IERC721} from "openzeppelin/interfaces/IERC721.sol";
-import {DelegateTokenStructs as Structs} from "delegate-market/src/libraries/DelegateTokenLib.sol";
-import {IDelegateRegistry} from "delegate-registry/src/IDelegateRegistry.sol";
-import {IDelegateToken} from "delegate-market/src/interfaces/IDelegateToken.sol";
+import {DelegateTokenStructs as Structs} from "./DelegateTokenLib.sol";
+import {IDelegateRegistry} from "./IDelegateRegistry.sol";
+import {IDelegateToken} from "./IDelegateToken.sol";
 
-abstract contract DelegateStaking {
+contract DelegateStaking {
     error NotStaked();
     error DelegationFailure();
 
@@ -30,6 +30,7 @@ abstract contract DelegateStaking {
             IERC721(_erc721).setApprovalForAll(_dt, true);
         }
 
+        /*
         // Instantiate struct and pack with all relevant data
         Structs.DelegateInfo memory dInfo;
         dInfo.principalHolder = address(this);
@@ -40,6 +41,7 @@ abstract contract DelegateStaking {
         dInfo.tokenId = _tokenId;
         dInfo.rights = "";
         dInfo.expiry = _expiry;
+        */
 
         // Stake ERC721 asset in DelegateToken.sol for delegate token in return
         //delegateId = IDelegateToken(_dt).create(dInfo, ++_salt);

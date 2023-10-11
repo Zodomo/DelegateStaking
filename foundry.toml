@@ -3,5 +3,10 @@ src = "src"
 out = "out"
 libs = ["lib"]
 remappings = ["openzeppelin/=lib/openzeppelin-contracts/contracts/"]
+solc = "0.8.21"
+evm_version = "paris"
+optimizer_runs = 9_999_999
+# don't think it's worth turning IR on due to potential for bugs
+viaIR = false
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
