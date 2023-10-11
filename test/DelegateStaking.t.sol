@@ -15,6 +15,6 @@ contract DelegateStakingTest is DSTestPlus {
     }
 
     function testSetRevokeRecipient() public {
-
+        
     }
 }
