@@ -6,14 +6,15 @@ import {DelegateTokenStructs as Structs} from "./DelegateTokenLib.sol";
 import {IDelegateRegistry} from "./IDelegateRegistry.sol";
 import {IDelegateToken} from "./IDelegateToken.sol";
 
+// Facilitate issuing delegate token to stakers so they can still claim airdrops/mints/etc
 abstract contract DelegateStaking {
     error NotStaked(address token, uint256 tokenId);
     error StillLocked(address token, uint256 tokenId);
-    error DelegationFailure(address token, uint256 tokenId);
 
     event Staked(address token, uint256 tokenId);
     event Revoked(address token, uint256 tokenId);
     event Unstaked(address token, uint256 tokenId);
+    event NewRevokeRecipient(address recipient);
 
     // Deployment address of DelegateToken.sol
     address internal immutable _dt;
@@ -35,6 +36,7 @@ abstract contract DelegateStaking {
     // Set recipient of revoked assets
     function _setRevokeRecipient(address _recipient) internal {
         _revokeRecipient = _recipient;
+        emit NewRevokeRecipient(_recipient);
     }
 
     // Internal handling for staking ERC721 asset in Delegate Market
@@ -62,15 +64,6 @@ abstract contract DelegateStaking {
             ),
             ++_salt
         );
-
-        // Confirm delegate token was distributed to sender
-        if (IERC721(_dt).ownerOf(delegateId) != msg.sender) {
-            revert DelegationFailure(_erc721, _tokenId);
-        }
-        // Confirm staked ERC721 token is held by DelegateToken contract
-        if (IERC721(_erc721).ownerOf(_tokenId) != _dt) {
-            revert DelegationFailure(_erc721, _tokenId);
-        }
     }
 
     // Stake ERC721 asset and retrieve delegate tokens
