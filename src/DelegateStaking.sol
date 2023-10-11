@@ -8,35 +8,25 @@ import {IDelegateToken} from "./IDelegateToken.sol";
 
 // Facilitate issuing delegate token to stakers so they can still claim airdrops/mints/etc
 abstract contract DelegateStaking {
-    error NotStaked(address token, uint256 tokenId);
     error StillLocked(address token, uint256 tokenId);
 
     event Staked(address token, uint256 tokenId);
     event Revoked(address token, uint256 tokenId);
     event Unstaked(address token, uint256 tokenId);
-    event NewRevokeRecipient(address recipient);
 
     // Deployment address of DelegateToken.sol
     address internal immutable _dt;
-    // Recipient of revoked assets, address(this) if none set
-    address internal _revokeRecipient;
     // Incrementing value to ensure nobody uses the same salt value, irrespective of sender
     uint256 internal _salt;
     // Delegate ID derivation (contract address => tokenId => delegateId)
     mapping(address => mapping(uint256 => uint256)) internal _delegateIds;
+    // Delegation expiry (delegateId => expiry timestamp)
+    mapping(uint256 => uint256) internal _delegateExpiry;
+    // Staked asset revoked status (delegateId => bool)
+    mapping(uint256 => bool) internal _revokeStatus;
 
-    constructor(address _delegateTokenContract, address _revokeReceiver) {
+    constructor(address _delegateTokenContract) {
         _dt = _delegateTokenContract;
-        if (_revokeReceiver == address(0)) {
-            _revokeReceiver = address(this);
-        }
-        _revokeRecipient = _revokeReceiver;
-    }
-
-    // Set recipient of revoked assets
-    function _setRevokeRecipient(address _recipient) internal {
-        _revokeRecipient = _recipient;
-        emit NewRevokeRecipient(_recipient);
     }
 
     // Internal handling for staking ERC721 asset in Delegate Market
@@ -64,6 +54,9 @@ abstract contract DelegateStaking {
             ),
             ++_salt
         );
+
+        // Log expiry timestamp
+        _delegateExpiry[delegateId] = _expiry;
     }
 
     // Stake ERC721 asset and retrieve delegate tokens
@@ -73,14 +66,16 @@ abstract contract DelegateStaking {
         uint256 _expiry
     ) internal {
         // Transfer ERC721 token to this contract
-        IERC721(_erc721).transferFrom(IERC721(_erc721).ownerOf(_tokenId), address(this), _tokenId);
-        // Ensure asset is now held by the contract
-        if (IERC721(_erc721).ownerOf(_tokenId) != address(this)) {
-            revert NotStaked(_erc721, _tokenId);
-        }
+        IERC721(_erc721).safeTransferFrom(IERC721(_erc721).ownerOf(_tokenId), address(this), _tokenId);
         // Process DelegateToken integration handling and store delegateId
         _delegateIds[_erc721][_tokenId] = _delegate721(_erc721, _tokenId, _expiry);
         emit Staked(_erc721, _tokenId);
+    }
+
+    // Revoke/Liquidate ownership of asset, preventing withdrawal once delegation expires
+    function _revoke721(address _erc721, uint256 _tokenId) internal {
+        _revokeStatus[_delegateIds[_erc721][_tokenId]] = true;
+        emit Revoked(_erc721, _tokenId);
     }
 
     // Rescind delegate token, withdraw from DelegateToken, purge storage
@@ -93,26 +88,7 @@ abstract contract DelegateStaking {
         IDelegateToken(_dt).withdraw(delegateId);
         // Purge storage
         delete _delegateIds[_erc721][_tokenId];
-    }
-
-    // Revoke/Liquidate ownership of asset and withdraw to address(this) or recipient if set
-    function _revoke721(address _erc721, uint256 _tokenId) internal {
-        // Rescind delegate token and withdraw
-        _remove721(_erc721, _tokenId);
-        // Transfer token only if recipient isn't address(this)
-        address recipient = _revokeRecipient;
-        if (recipient == address(this)) { return; }
-        IERC721(_erc721).transferFrom(address(this), _revokeRecipient, _tokenId);
-        emit Revoked(_erc721, _tokenId);
-    }
-
-    // Check if staked token is unlockable and return the timestamp it expired if it is
-    function _check721(address _erc721, uint256 _tokenId) internal view returns (uint256 timestamp) {
-        // Cache DelegateInfo struct
-        Structs.DelegateInfo memory dInfo = IDelegateToken(_dt).getDelegateTokenInfo(_delegateIds[_erc721][_tokenId]);
-        // Revert if expiry hasn't been passed
-        if (dInfo.expiry > block.timestamp) { revert StillLocked(dInfo.tokenContract, dInfo.tokenId); }
-        return (dInfo.expiry);
+        delete _delegateExpiry[delegateId];
     }
 
     // Unstake ERC721 if delegation expiry has been reached
@@ -121,12 +97,18 @@ abstract contract DelegateStaking {
         address _recipient,
         uint256 _tokenId
     ) internal {
-        // Verify if token can be unlocked
-        _check721(_erc721, _tokenId);
+        // Cache delegateId for gas savings
+        uint256 delegateId = _delegateIds[_erc721][_tokenId];
+        // Verify if token is unlocked
+        if (_delegateExpiry[delegateId] > block.timestamp) {
+            revert StillLocked(_erc721, _tokenId);
+        }
         // Rescind delegate token and withdraw
         _remove721(_erc721, _tokenId);
-        // Execute token transfer
-        IERC721(_erc721).transferFrom(address(this), _recipient, _tokenId);
+        // Only transfer token if it hasn't been revoked
+        if (!_revokeStatus[delegateId]) {
+            IERC721(_erc721).transferFrom(address(this), _recipient, _tokenId);
+        }
         emit Unstaked(_erc721, _tokenId);
     }
 

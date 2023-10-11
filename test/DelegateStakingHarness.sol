@@ -5,11 +5,22 @@ import "../src/DelegateStaking.sol";
 
 // Testing harness to access internal functions
 contract DelegateStakingHarness is DelegateStaking {
-    constructor(address _delegateTokenContract, address _revokeReceiver)
-        DelegateStaking(_delegateTokenContract, _revokeReceiver) { }
+    constructor(address _delegateTokenContract) DelegateStaking(_delegateTokenContract) { }
 
-    function setRevokeRecipient(address _recipient) public {
-        _setRevokeRecipient(_recipient);
+    function get_dt() public view returns (address) {
+        return (_dt);
+    }
+    function get_salt() public view returns (uint256) {
+        return (_salt);
+    }
+    function get_delegateIds(address _erc721, uint256 _tokenId) public view returns (uint256) {
+        return (_delegateIds[_erc721][_tokenId]);
+    }
+    function get_delegateExpiry(uint256 _delegateId) public view returns (uint256) {
+        return (_delegateExpiry[_delegateId]);
+    }
+    function get_revokeStatus(uint256 _delegateId) public view returns (bool) {
+        return (_revokeStatus[_delegateId]);
     }
 
     function stake721(
@@ -22,10 +33,6 @@ contract DelegateStakingHarness is DelegateStaking {
 
     function revoke721(address _erc721, uint256 _tokenId) public {
         _revoke721(_erc721, _tokenId);
-    }
-
-    function check721(address _erc721, uint256 _tokenId) public view returns (uint256) {
-        return (_check721(_erc721, _tokenId));
     }
 
     function unstake721(
