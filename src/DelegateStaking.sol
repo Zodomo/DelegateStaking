@@ -6,7 +6,7 @@ import {DelegateTokenStructs as Structs} from "./DelegateTokenLib.sol";
 import {IDelegateRegistry} from "./IDelegateRegistry.sol";
 import {IDelegateToken} from "./IDelegateToken.sol";
 
-contract DelegateStaking {
+abstract contract DelegateStaking {
     error NotStaked(address token, uint256 tokenId);
     error StillLocked(address token, uint256 tokenId);
     error DelegationFailure(address token, uint256 tokenId);
@@ -124,5 +124,15 @@ contract DelegateStaking {
         _remove721(_delegateIds[_erc721][_tokenId]);
         // Execute token transfer
         IERC721(_erc721).transferFrom(address(this), _recipient, _tokenId);
+    }
+
+    // Implement ERC721 receiver interface to support safe transfers
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external virtual returns (bytes4) {
+        return DelegateStaking.onERC721Received.selector;
     }
 }
