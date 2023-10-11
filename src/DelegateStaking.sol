@@ -7,8 +7,9 @@ import {IDelegateRegistry} from "./IDelegateRegistry.sol";
 import {IDelegateToken} from "./IDelegateToken.sol";
 
 contract DelegateStaking {
-    error NotStaked();
-    error DelegationFailure();
+    error NotStaked(address token, uint256 tokenId);
+    error StillLocked(address token, uint256 tokenId);
+    error DelegationFailure(address token, uint256 tokenId);
 
     // Deployment address of DelegateToken.sol
     address private immutable _dt;
@@ -30,21 +31,7 @@ contract DelegateStaking {
             IERC721(_erc721).setApprovalForAll(_dt, true);
         }
 
-        /*
-        // Instantiate struct and pack with all relevant data
-        Structs.DelegateInfo memory dInfo;
-        dInfo.principalHolder = address(this);
-        dInfo.tokenType = IDelegateRegistry.DelegationType.ERC721;
-        dInfo.delegateHolder = msg.sender;
-        dInfo.amount = 0;
-        dInfo.tokenContract = _erc721;
-        dInfo.tokenId = _tokenId;
-        dInfo.rights = "";
-        dInfo.expiry = _expiry;
-        */
-
         // Stake ERC721 asset in DelegateToken.sol for delegate token in return
-        //delegateId = IDelegateToken(_dt).create(dInfo, ++_salt);
         delegateId = IDelegateToken(_dt).create(
             Structs.DelegateInfo(
                 address(this),
@@ -61,11 +48,11 @@ contract DelegateStaking {
 
         // Confirm delegate token was distributed to sender
         if (IERC721(_dt).ownerOf(delegateId) != msg.sender) {
-            revert DelegationFailure();
+            revert DelegationFailure(_erc721, _tokenId);
         }
         // Confirm staked ERC721 token is held by DelegateToken contract
         if (IERC721(_erc721).ownerOf(_tokenId) != _dt) {
-            revert DelegationFailure();
+            revert DelegationFailure(_erc721, _tokenId);
         }
     }
 
@@ -79,9 +66,24 @@ contract DelegateStaking {
         IERC721(_erc721).transferFrom(IERC721(_erc721).ownerOf(_tokenId), address(this), _tokenId);
         // Ensure asset is now held by the contract
         if (IERC721(_erc721).ownerOf(_tokenId) != address(this)) {
-            revert NotStaked();
+            revert NotStaked(_erc721, _tokenId);
         }
         // Process DelegateToken integration handling
         _delegate721(_erc721, _tokenId, _expiry);
+    }
+
+    // Check if staked token is unlockable
+    function _check721(uint256 _delegateId) internal view returns (uint256 timestamp) {
+        Structs.DelegateInfo memory dInfo = IDelegateToken(_dt).getDelegateTokenInfo(_delegateId);
+        if (dInfo.expiry > block.timestamp) { revert StillLocked(dInfo.tokenContract, dInfo.tokenId); }
+        return (dInfo.expiry);
+    }
+
+    function _unstake721(
+        address _erc721,
+        address _recipient,
+        uint256 _tokenId
+    ) internal {
+
     }
 }
