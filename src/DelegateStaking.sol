@@ -85,6 +85,24 @@ contract DelegateStaking {
         _delegateIds[_erc721][_tokenId] = _delegate721(_erc721, _tokenId, _expiry);
     }
 
+    // Rescind delegate token and withdraw from DelegateToken
+    function _remove721(uint256 _delegateId) private {
+        // Rescind delegate token
+        IDelegateToken(_dt).rescind(_delegateId);
+        // Withdraw ERC721 token from DelegateToken
+        IDelegateToken(_dt).withdraw(_delegateId);
+    }
+
+    // Revoke/Liquidate ownership of asset and withdraw to address(this) or recipient if set
+    function _revoke721(address _erc721, uint256 _tokenId) internal {
+        // Rescind delegate token and withdraw
+        _remove721(_delegateIds[_erc721][_tokenId]);
+        // Transfer token only if recipient isn't address(this)
+        address recipient = _revokeRecipient;
+        if (recipient == address(this)) { return; }
+        IERC721(_erc721).transferFrom(address(this), _revokeRecipient, _tokenId);
+    }
+
     // Check if staked token is unlockable and return the timestamp it expired if it is
     function _check721(address _erc721, uint256 _tokenId) internal view returns (uint256 timestamp) {
         // Cache DelegateInfo struct
@@ -92,20 +110,6 @@ contract DelegateStaking {
         // Revert if expiry hasn't been passed
         if (dInfo.expiry > block.timestamp) { revert StillLocked(dInfo.tokenContract, dInfo.tokenId); }
         return (dInfo.expiry);
-    }
-
-    // Revoke ownership of asset and withdraw to address(this) or recipient if set
-    function _revoke721(address _erc721, uint256 _tokenId) internal {
-        // Cache delegateId for gas savings
-        uint256 delegateId = _delegateIds[_erc721][_tokenId];
-        // Rescind delegate token
-        IDelegateToken(_dt).rescind(delegateId);
-        // Withdraw ERC721 token from DelegateToken
-        IDelegateToken(_dt).withdraw(delegateId);
-        // Transfer token only if recipient isn't address(this)
-        address recipient = _revokeRecipient;
-        if (recipient == address(this)) { return; }
-        IERC721(_erc721).transferFrom(address(this), _revokeRecipient, _tokenId);
     }
 
     // Unstake ERC721 if delegation expiry has been reached
@@ -116,6 +120,7 @@ contract DelegateStaking {
     ) internal {
         // Verify if token can be unlocked
         _check721(_erc721, _tokenId);
-        
+        // Rescind delegate token and withdraw
+        _remove721(_delegateIds[_erc721][_tokenId]);
     }
 }
