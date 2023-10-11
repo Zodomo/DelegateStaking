@@ -122,5 +122,7 @@ contract DelegateStaking {
         _check721(_erc721, _tokenId);
         // Rescind delegate token and withdraw
         _remove721(_delegateIds[_erc721][_tokenId]);
+        // Execute token transfer
+        IERC721(_erc721).transferFrom(address(this), _recipient, _tokenId);
     }
 }
